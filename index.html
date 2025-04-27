@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HawkMath</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* LaTeX editor/viewer styles */
+        .latex-container {
+            display: flex;
+            height: 300px;
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .panel {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+        }
+        
+        #editor-panel {
+            border-right: 1px solid #ccc;
+            background-color: #f8f9fa;
+        }
+        
+        #preview-panel {
+            background-color: white;
+            padding: 10px;
+        }
+        
+        .cm-editor {
+            height: 100%;
+            font-size: 14px;
+        }
+        
+        /* Audio recorder styles */
+        .audio-container {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        
+        button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        
+        #mic {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 1rem;
+            height: 128px;
+        }
+        
+        #recordings {
+            margin: 1rem 0;
+        }
+        
+        .recording-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        
+        select, label {
+            margin-right: 15px;
+        }
+        
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+    </style>
+    
+    <!-- CodeMirror -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/stex/stex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/edit/matchbrackets.min.js"></script>
+    
+    <!-- MathJax -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
+    
+    <!-- WaveSurfer for audio recording -->
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/record.min.js"></script>
+</head>
+<body>
+    <!-- LaTeX Editor and Viewer -->
+    <h2>LaTeX Editor</h2>
+    <div class="latex-container">
+        <div class="panel" id="editor-panel">
+            <textarea id="latex-editor"></textarea>
+        </div>
+        <div class="panel" id="preview-panel">
+            <div id="output"></div>
+        </div>
+    </div>
+    
+    <!-- Audio Recorder -->
+    <div class="audio-container">
+        <h2>Audio Recorder</h2>
+        
+        <button id="record">Record</button>
+        <button id="pause" style="display: none;">Pause</button>
+
+        <!-- <select id="mic-select">
+            <option value="" hidden>Select mic</option>
+        </select> -->
+
+        <label><input type="checkbox" id="scrollingWaveform" /> Scrolling waveform</label>
+        <label><input type="checkbox" id="continuousWaveform" checked="checked" /> Continuous waveform</label>
+
+        <p id="progress">00:00</p>
+
+        <div id="mic"></div>
+
+        <div id="recordings"></div>
+    </div>
+    
+    <script>
+        // ========== LaTeX Editor Setup ==========
+        
+        // Initialize CodeMirror editor
+        const editor = CodeMirror.fromTextArea(document.getElementById("latex-editor"), {
+            mode: "stex",
+            theme: "default",
+            lineNumbers: true,
+            matchBrackets: true,
+            lineWrapping: true,
+            autofocus: true
+        });
+        
+        // Auto-resize editor to fit container
+        function resizeEditor() {
+            const editorElement = editor.getWrapperElement();
+            const height = document.getElementById('editor-panel').clientHeight;
+            editorElement.style.height = `${height - 20}px`;
+            editor.refresh();
+        }
+        
+        window.addEventListener('resize', resizeEditor);
+        setTimeout(resizeEditor, 100); // Initial resize
+        
+
+        // Auto-render on content change (with debounce)
+        let renderTimeout;
+        editor.on('change', function() {
+            clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(renderLaTeX, 1000);
+        });
+        
+        // Render function
+        function renderLaTeX() {
+            const latex = editor.getValue();
+            const outputDiv = document.getElementById('output');
+            
+            outputDiv.innerHTML = latex;
+            MathJax.typesetPromise([outputDiv]).catch(err => {
+                console.log('MathJax error:', err);
+                outputDiv.innerHTML += '<p style="color: red;">Error rendering LaTeX. Check your syntax.</p>';
+            });
+        }
+        
+        // Set initial content and render
+        editor.setValue("");
+        setTimeout(renderLaTeX, 500); // Render after MathJax is loaded
+        
+        // ========== Audio Recorder Setup ==========
+        
+        let wavesurfer, record;
+        let scrollingWaveform = false;
+        let continuousWaveform = true;
+
+        const createWaveSurfer = () => {
+            // Destroy the previous wavesurfer instance
+            if (wavesurfer) {
+                wavesurfer.destroy();
+            }
+
+            // Create a new Wavesurfer instance
+            wavesurfer = WaveSurfer.create({
+                container: '#mic',
+                waveColor: 'rgb(200, 0, 200)',
+                progressColor: 'rgb(100, 0, 100)',
+            });
+
+            // Initialize the Record plugin
+            record = wavesurfer.registerPlugin(
+                WaveSurfer.Record.create({
+                    renderRecordedAudio: false,
+                    scrollingWaveform,
+                    continuousWaveform,
+                    continuousWaveformDuration: 30,
+                }),
+            );
+
+            // Render recorded audio
+            record.on('record-end', (blob) => {
+                const container = document.createElement('div');
+                container.className = 'recording-container';
+                document.querySelector('#recordings').prepend(container);
+                
+                const recordedUrl = URL.createObjectURL(blob);
+
+                // Create wavesurfer from the recorded audio
+                const newWavesurfer = WaveSurfer.create({
+                    container,
+                    waveColor: 'rgb(200, 100, 0)',
+                    progressColor: 'rgb(100, 50, 0)',
+                    url: recordedUrl,
+                });
+
+                // Play button
+                const button = container.appendChild(document.createElement('button'));
+                button.textContent = 'Play';
+                button.onclick = () => newWavesurfer.playPause();
+                newWavesurfer.on('pause', () => (button.textContent = 'Play'));
+                newWavesurfer.on('play', () => (button.textContent = 'Pause'));
+
+                // Download link
+                const link = container.appendChild(document.createElement('a'));
+                Object.assign(link, {
+                    href: recordedUrl,
+                    download: 'hawkmath-recording.' + blob.type.split(';')[0].split('/')[1] || 'webm',
+                    textContent: 'Download recording',
+                    style: 'margin-left: 10px;'
+                });
+            });
+
+            pauseButton.style.display = 'none';
+            recButton.textContent = 'Record';
+
+            record.on('record-progress', (time) => {
+                updateProgress(time);
+            });
+        }
+
+        const progress = document.querySelector('#progress');
+        const updateProgress = (time) => {
+            // time will be in milliseconds, convert it to mm:ss format
+            const formattedTime = [
+                Math.floor((time % 3600000) / 60000), // minutes
+                Math.floor((time % 60000) / 1000), // seconds
+            ]
+                .map((v) => (v < 10 ? '0' + v : v))
+                .join(':');
+            progress.textContent = formattedTime;
+        }
+
+        const pauseButton = document.querySelector('#pause');
+        pauseButton.onclick = () => {
+            if (record.isPaused()) {
+                record.resumeRecording();
+                pauseButton.textContent = 'Pause';
+                return;
+            }
+
+            record.pauseRecording();
+            pauseButton.textContent = 'Resume';
+        }
+
+        let mic_id;
+        // Mic selection
+        WaveSurfer.Record.getAvailableAudioDevices().then((devices) => {
+            devices.forEach((device) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                mic_id = device.deviceId
+                option.text = device.label || device.deviceId;
+                micSelect.appendChild(option);
+            });
+        });
+
+        // Record button
+        const recButton = document.querySelector('#record');
+
+        recButton.onclick = () => {
+            if (record.isRecording() || record.isPaused()) {
+                record.stopRecording();
+                recButton.textContent = 'Record';
+                pauseButton.style.display = 'none';
+                return;
+            }
+
+            recButton.disabled = true;
+
+            // get selected device
+            const deviceId = mic_id
+            record.startRecording({ deviceId }).then(() => {
+                recButton.textContent = 'Stop';
+                recButton.disabled = false;
+                pauseButton.style.display = 'inline';
+            });
+        }
+
+        document.querySelector('#scrollingWaveform').onclick = (e) => {
+            scrollingWaveform = e.target.checked;
+            if (continuousWaveform && scrollingWaveform) {
+                continuousWaveform = false;
+                document.querySelector('#continuousWaveform').checked = false;
+            }
+            createWaveSurfer();
+        }
+
+        document.querySelector('#continuousWaveform').onclick = (e) => {
+            continuousWaveform = e.target.checked;
+            if (continuousWaveform && scrollingWaveform) {
+                scrollingWaveform = false;
+                document.querySelector('#scrollingWaveform').checked = false;
+            }
+            createWaveSurfer();
+        }
+
+        // Initialize on page load
+        window.onload = function() {
+            createWaveSurfer();
+        };
+    </script>
+</body>
+</html>
