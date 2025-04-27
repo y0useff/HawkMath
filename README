@@ -14,23 +14,23 @@ Git (optional, for cloning the repository)
 Installation Steps
 
 Clone or download the repository
-bashgit clone https://github.com/y0useff/HawkMath
+git clone https://github.com/y0useff/HawkMath
 cd HawkMath
 
 Create a virtual environment (recommended)
-bashpython -m venv venv
+python -m venv venv
 Activate the virtual environment:
 
 Windows:
-bashvenv\Scripts\activate
+venv\Scripts\activate
 
 macOS/Linux:
-bashsource venv/bin/activate
+source venv/bin/activate
 
 
 
 Install required packages
-bashpip install -r requirements.txt
+pip install -r requirements.txt
 
 Download the Whisper model
 Option 1: Let the application download the model automatically on first run
