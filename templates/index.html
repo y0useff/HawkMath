@@ -281,6 +281,8 @@
                                 current_latex = editor.getValue()
                                 
                                 if (latexResponse.includes("\\")) {
+                                    latexResponse.replace("\\\\", " ")
+                                    latexResponse.replace("\n\\\\\", "")
                                     editor.setValue(current_latex + "\n" + latexResponse)
                                 }
                             })
