@@ -181,6 +181,84 @@ def hand_parse():
     
     return parsed_result
 
+# @app.route('/parse_audio_gpt', methods=['POST'])
+# def gpt_parse():
+#     # Check if the request is JSON or raw data
+#     if request.is_json:
+#         data = request.get_json()
+#         if not data or 'text' not in data:
+#             return jsonify({'error': 'Missing text in request'}), 400
+#         text = data['text']
+#     else:
+#         # Read raw data (plain text)
+#         text = request.data.decode('utf-8')
+        
+#     if not text:
+#         return jsonify({'error': 'Missing text body'}), 400
+
+#     print(f"GPT parse request received: {text}")
+    
+#     # OpenAI API configuration
+#     openai_api_key = os.getenv('OPENAI_API_KEY')
+    
+#     # System prompt for GPT
+#     system_prompt = """The user will give you a verbal natural language expression, given by someone trying to write a math expression. Please give it to me in LaTeX, respond only with LaTex, and make it so each term is on a new line, with the begin and end tags having their own lines. For terms involving functions, such as \frac, output the following format:
+
+#     \frac
+#     {numerator}
+#     {denominator}
+
+#     Example output:
+
+#     \begin{align}
+#     \int
+#     \frac
+#     {-4x^2}
+#     {x}
+#     dx
+#     \end{align}
+
+#     Ensure that there are NO "//" substrings present in the output. They will unintentionally create new lines.
+
+#     \begin{align}
+#     U = \\
+#     \ln \\
+#     K
+#     \end{align}
+
+#     THIS is bad output."""
+    
+#     messages = [
+#         {"role": "system", "content": system_prompt},
+#         {"role": "user", "content": text}
+#     ]
+    
+#     try:
+#         response = requests.post(
+#             "https://api.openai.com/v1/chat/completions",
+#             headers={
+#                 "Content-Type": "application/json",
+#                 "Authorization": f"Bearer {openai_api_key}"
+#             },
+#             json={
+#                 "model": "gpt-4",
+#                 "messages": messages
+#             }
+#         )
+        
+#         response_data = response.json()
+#         if 'choices' in response_data and len(response_data['choices']) > 0:
+#             latex_response = response_data['choices'][0]['message']['content']
+#             print(f"GPT parse result: {latex_response}")
+
+#             return latex_response
+#         else:
+#             print(f"Error in GPT response: {response_data}")
+#             return "Error processing with GPT. Please try again."
+    
+#     except Exception as e:
+#         print(f"Error communicating with OpenAI API: {e}")
+#         return f"Error: {str(e)}"
 @app.route('/parse_audio_gpt', methods=['POST'])
 def gpt_parse():
     # Check if the request is JSON or raw data
@@ -250,7 +328,18 @@ def gpt_parse():
         if 'choices' in response_data and len(response_data['choices']) > 0:
             latex_response = response_data['choices'][0]['message']['content']
             print(f"GPT parse result: {latex_response}")
-            return latex_response
+            
+            # Check for slash characters
+            if "/" not in latex_response:
+                # No "/" found, return without rendering LaTeX
+                return latex_response
+            elif "//" in latex_response:
+                # Replace "//" with spaces before rendering
+                modified_response = latex_response.replace("//", " ")
+                return modified_response  # This will be rendered as LaTeX
+            else:
+                # Single "/" found, render normally
+                return latex_response  # This will be rendered as LaTeX
         else:
             print(f"Error in GPT response: {response_data}")
             return "Error processing with GPT. Please try again."
