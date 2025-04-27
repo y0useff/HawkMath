@@ -1,4 +1,5 @@
-import re
+
+
 
 def word_to_number(text):
     units = {
@@ -116,6 +117,9 @@ def transmute(text):
     return "\\begin{align}\n" + ' '.join(result) + "\n\\end{align}"
 
 # Example usage
+
+
+
 x="five divide by eight minus three divide by eight open parenthesis two times four close parenthesis plus 3x minus k divide by 3"
 result = transmute(x)
 print(result)

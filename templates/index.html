@@ -118,13 +118,11 @@
         </select> -->
 
         <label><input type="checkbox" id="scrollingWaveform" /> Scrolling waveform</label>
-        <label><input type="checkbox" id="continuousWaveform" checked="checked" /> Continuous waveform</label>
 
         <p id="progress">00:00</p>
 
         <div id="mic"></div>
 
-        <div id="recordings"></div>
     </div>
     
     <script>
@@ -204,38 +202,117 @@
                 }),
             );
 
-            // Render recorded audio
             record.on('record-end', (blob) => {
                 const container = document.createElement('div');
                 container.className = 'recording-container';
-                document.querySelector('#recordings').prepend(container);
-                
-                const recordedUrl = URL.createObjectURL(blob);
 
-                // Create wavesurfer from the recorded audio
-                const newWavesurfer = WaveSurfer.create({
-                    container,
-                    waveColor: 'rgb(200, 100, 0)',
-                    progressColor: 'rgb(100, 50, 0)',
-                    url: recordedUrl,
-                });
+                if (blob.size > 0) {
+                    const recordedUrl = URL.createObjectURL(blob);
+                    console.log('Created blob URL:', recordedUrl);
 
-                // Play button
-                const button = container.appendChild(document.createElement('button'));
-                button.textContent = 'Play';
-                button.onclick = () => newWavesurfer.playPause();
-                newWavesurfer.on('pause', () => (button.textContent = 'Play'));
-                newWavesurfer.on('play', () => (button.textContent = 'Pause'));
+                    document.body.appendChild(container);
 
-                // Download link
-                const link = container.appendChild(document.createElement('a'));
-                Object.assign(link, {
-                    href: recordedUrl,
-                    download: 'hawkmath-recording.' + blob.type.split(';')[0].split('/')[1] || 'webm',
-                    textContent: 'Download recording',
-                    style: 'margin-left: 10px;'
-                });
+                    const link = container.appendChild(document.createElement('a'));
+                    Object.assign(link, {
+                        href: recordedUrl,
+                        download: 'hawkmath-recording.webm',
+                        textContent: 'Download recording',
+                        style: 'margin-left: 10px; display: block; margin-top: 10px;'
+                    });
+
+                    link.addEventListener('click', () => {
+                        setTimeout(() => {
+                            URL.revokeObjectURL(recordedUrl);
+                        }, 1000);
+                    });
+
+                    // ========== 👇 Send Blob to Python Flask server ==========
+
+                    const formData = new FormData();
+                    formData.append('audio', blob, 'recording.webm');
+
+                    fetch('http://127.0.0.1:5000/process_audio', {  // Change to your server URL
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        transcribed_text = data
+
+                        const messages = [
+                                {
+                                    role: "system",
+                                    content: `The user will give you  a verbal natural language expression, given by someone trying to write a math expression. Please give it to me in LaTeX, respond only with LaTex, and make it so each term is on a new line, with the begin and end tags having their own lines. For terms involving functions, such as \frac, output the following format:
+
+                                \frac
+                                {numerator}
+                                {denominator}
+
+                                Example output:
+
+                                \begin{align}
+                                \int
+                                \frac
+                                {-4x^2}
+                                {x}
+                                dx
+                                \end{align}
+
+                                Ensure that there are NO "//" substrings present in the output. They will unintentionally create new lines.
+
+                                \begin{align}
+                                U = \\
+                                \ln \\
+                                K
+                                \end{align}
+
+                                THIS is bad output.
+                                `},
+                                {
+                                    role: "user",
+                                    content: transcribed_text
+                                }
+                            ];
+
+                            fetch('https://api.openai.com/v1/chat/completions', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer ' // replace this with your key
+                                    //delete this before you push to github
+                                    //too lazy to write more server code
+                                    //watch me forget anyways
+                                },
+                                body: JSON.stringify({
+                                    model: 'gpt-4', // or 'gpt-3.5-turbo' if you prefer
+                                    messages: messages
+                                })
+                            })
+                            .then(response => response.json())
+                            .then(chatgptData => {
+                                const latexResponse = chatgptData.choices[0].message.content;
+                                current_latex = editor.getValue()
+                                
+                                if (latexResponse.includes("\\")) {
+                                    editor.setValue(current_latex + "\n" + latexResponse)
+                                }
+                                console.log(latexResponse)
+                                // you can now display latexResponse to your user
+                            })
+                            .catch(error => console.error('Error communicating with ChatGPT:', error));
+                        
+                    })
+                    .catch(error => {
+                        console.error('Error sending audio:', error);
+                    });
+
+                    // ========== 👆 Send Blob to Python Flask server ==========
+                } else {
+                    console.error('Recording blob is empty or invalid');
+                    container.textContent = 'Recording failed or was empty';
+                }
             });
+
 
             pauseButton.style.display = 'none';
             recButton.textContent = 'Record';
@@ -277,7 +354,7 @@
                 option.value = device.deviceId;
                 mic_id = device.deviceId
                 option.text = device.label || device.deviceId;
-                micSelect.appendChild(option);
+                // micSelect.appendChild(option);
             });
         });
 
@@ -307,19 +384,18 @@
             scrollingWaveform = e.target.checked;
             if (continuousWaveform && scrollingWaveform) {
                 continuousWaveform = false;
-                document.querySelector('#continuousWaveform').checked = false;
             }
             createWaveSurfer();
         }
 
-        document.querySelector('#continuousWaveform').onclick = (e) => {
-            continuousWaveform = e.target.checked;
-            if (continuousWaveform && scrollingWaveform) {
-                scrollingWaveform = false;
-                document.querySelector('#scrollingWaveform').checked = false;
-            }
-            createWaveSurfer();
-        }
+        // document.querySelector('#continuousWaveform').onclick = (e) => {
+        //     continuousWaveform = e.target.checked;
+        //     if (continuousWaveform && scrollingWaveform) {
+        //         scrollingWaveform = false;
+        //         document.querySelector('#scrollingWaveform').checked = false;
+        //     }
+        //     createWaveSurfer();
+        // }
 
         // Initialize on page load
         window.onload = function() {
