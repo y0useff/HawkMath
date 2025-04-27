@@ -37,7 +37,7 @@ def word_to_number(text):
             return None
     return num + current
 
-def transmute(text):
+def parse(text):
     operations = {
         "add": "+", "plus": "+", "minus": "-", "subtract": "-",
         "multiply": "\\times", "times": "\\times",
@@ -120,6 +120,6 @@ def transmute(text):
 
 
 
-x="five divide by eight minus three divide by eight open parenthesis two times four close parenthesis plus 3x minus k divide by 3"
-result = transmute(x)
+i="five divide by eight minus three divide by eight open parenthesis two times four close parenthesis plus 3x minus k divide by 3"
+result = parse(i)
 print(result)
