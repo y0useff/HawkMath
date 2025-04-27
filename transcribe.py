@@ -8,3 +8,4 @@ result = model.transcribe("alex.mp3")
 # 'temperature': 0.0, 'avg_logprob': -0.629383365313212, 'compression_ratio': 0.5555555555555556, 'no_speech_prob': 0.09730338305234909}], 'language': 'en'}
 print(result["text"])
 #4 x squared
+
