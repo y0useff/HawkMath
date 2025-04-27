@@ -4,10 +4,19 @@ from werkzeug.utils import secure_filename
 import os
 import re
 import requests
+from dotenv import load_dotenv
 import json
 
+
+load_dotenv()
+
+
+file_path = os.getenv('FILE_PATH')
+
 # Load whisper model
-model = whisper.load_model("./models/base.en.pt")
+model = whisper.load_model(file_path)
+
+
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -190,7 +199,7 @@ def gpt_parse():
     print(f"GPT parse request received: {text}")
     
     # OpenAI API configuration
-    openai_api_key = "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"
+    openai_api_key = os.getenv('OPENAI_API_KEY')
     
     # System prompt for GPT
     system_prompt = """The user will give you a verbal natural language expression, given by someone trying to write a math expression. Please give it to me in LaTeX, respond only with LaTex, and make it so each term is on a new line, with the begin and end tags having their own lines. For terms involving functions, such as \frac, output the following format:

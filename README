@@ -1,0 +1,73 @@
+Math Expression to LaTeX Converter
+This application transcribes spoken math expressions and converts them to LaTeX format. It uses Whisper for speech-to-text and offers two parsing options:
+
+A custom rule-based parser
+OpenAI's GPT-4 for more complex expressions
+
+Setup Instructions
+Prerequisites
+
+Python 3.7+
+pip (Python package manager)
+Git (optional, for cloning the repository)
+
+Installation Steps
+
+Clone or download the repository
+bashgit clone https://github.com/y0useff/HawkMath
+cd HawkMath
+
+Create a virtual environment (recommended)
+bashpython -m venv venv
+Activate the virtual environment:
+
+Windows:
+bashvenv\Scripts\activate
+
+macOS/Linux:
+bashsource venv/bin/activate
+
+
+
+Install required packages
+bashpip install -r requirements.txt
+
+Download the Whisper model
+Option 1: Let the application download the model automatically on first run
+Option 2: Download the model manually from:
+
+GitHub: https://github.com/openai/whisper
+Direct link for base English model: base.en.pt
+
+When downloading manually, place the model file in a directory of your choice (you'll reference this location in your .env file).
+Set up environment variables
+Create a .env file in the root directory of the project with the following content:
+OPENAI_API_KEY=your_openai_api_key_here
+FILE_PATH=/path/to/your/whisper/model/base.en.pt
+Replace:
+
+your_openai_api_key_here with your OpenAI API key (get one from OpenAI's platform)
+/path/to/your/whisper/model/base.en.pt with the path to your downloaded Whisper model file
+
+
+Create uploads directory
+mkdir uploads
+
+
+Running the Application
+
+Start the Flask server
+bashpython app.py
+
+Access the application
+Open your web browser and go to: http://127.0.0.1:5000
+
+Using the Application
+
+Click the microphone button and speak a math expression
+Choose your preferred parsing method:
+Custom rule-based parser (better for simpler expressions)
+"GPT" for the GPT-4 powered parser (better for complex expressions)
+
+
+View the generated LaTeX in the editor
