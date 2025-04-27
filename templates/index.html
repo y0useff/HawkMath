@@ -10,6 +10,21 @@
             padding: 20px;
         }
         
+        /* Parser mode selection */
+        .parser-selection {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .parser-selection select {
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        
         /* LaTeX editor/viewer styles */
         .latex-container {
             display: flex;
@@ -95,6 +110,15 @@
     <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/record.min.js"></script>
 </head>
 <body>
+    <!-- Parser Mode Selection -->
+    <div class="parser-selection">
+        <label for="parser-mode"><strong>Parser Mode:</strong></label>
+        <select id="parser-mode">
+            <option value="gpt">GPT Parser (better for complex equations, costs API credits)</option>
+            <option value="eric">Eric's Custom Parser (free and good for simple math)</option>
+        </select>
+    </div>
+    
     <!-- LaTeX Editor and Viewer -->
     <h2>LaTeX Editor</h2>
     <div class="latex-container">
@@ -113,11 +137,6 @@
         <button id="record">Record</button>
         <button id="pause" style="display: none;">Pause</button>
 
-        <!-- <select id="mic-select">
-            <option value="" hidden>Select mic</option>
-        </select> -->
-
-
         <p id="progress">00:00</p>
 
         <div id="mic"></div>
@@ -125,6 +144,16 @@
     </div>
     
     <script>
+        // ========== Parser Mode Setup ==========
+        let parser_mode = "gpt";
+        
+        // Set up parser mode dropdown
+        const parserModeSelect = document.getElementById('parser-mode');
+        parserModeSelect.addEventListener('change', function() {
+            parser_mode = this.value;
+            console.log(`Parser mode changed to: ${parser_mode}`);
+        });
+        
         // ========== LaTeX Editor Setup ==========
         
         // Initialize CodeMirror editor
@@ -206,22 +235,6 @@
                     const recordedUrl = URL.createObjectURL(blob);
                     console.log('Created blob URL:', recordedUrl);
 
-                    // document.body.appendChild(container);
-
-                    // const link = container.appendChild(document.createElement('a'));
-                    // Object.assign(link, {
-                    //     href: recordedUrl,
-                    //     download: 'hawkmath-recording.webm',
-                    //     textContent: 'Download recording',
-                    //     style: 'margin-left: 10px; display: block; margin-top: 10px;'
-                    // });
-
-                    // link.addEventListener('click', () => {
-                    //     setTimeout(() => {
-                    //         URL.revokeObjectURL(recordedUrl);
-                    //     }, 1000);
-                    // });
-
                     // ========== 👇 Send Blob to Python Flask server ==========
 
                     const formData = new FormData();
@@ -234,73 +247,52 @@
                     .then(response => response.json())
                     .then(data => {
                         transcribed_text = data
-
-                        const messages = [
-                                {
-                                    role: "system",
-                                    content: `The user will give you  a verbal natural language expression, given by someone trying to write a math expression. Please give it to me in LaTeX, respond only with LaTex, and make it so each term is on a new line, with the begin and end tags having their own lines. For terms involving functions, such as \frac, output the following format:
-
-                                \frac
-                                {numerator}
-                                {denominator}
-
-                                Example output:
-
-                                \begin{align}
-                                \int
-                                \frac
-                                {-4x^2}
-                                {x}
-                                dx
-                                \end{align}
-
-                                Ensure that there are NO "//" substrings present in the output. They will unintentionally create new lines.
-
-                                \begin{align}
-                                U = \\
-                                \ln \\
-                                K
-                                \end{align}
-
-                                THIS is bad output.
-                                `},
-                                {
-                                    role: "user",
-                                    content: transcribed_text
-                                }
-                            ];
-
-                            fetch('https://api.openai.com/v1/chat/completions', {
+                        if (parser_mode == "eric") {
+                            fetch('http://127.0.0.1:5000/parse_audio', {
                                 method: 'POST',
                                 headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': 'Bearer ' // replace this with your key
-                                    //delete this before you push to github
-                                    //too lazy to write more server code
-                                    //watch me forget anyways
+                                    'Content-Type': 'application/json'
                                 },
-                                body: JSON.stringify({
-                                    model: 'gpt-4', // or 'gpt-3.5-turbo' if you prefer
-                                    messages: messages
-                                })
+                                body: JSON.stringify({ text: transcribed_text })
                             })
-                            .then(response => response.json())
-                            .then(chatgptData => {
-                                const latexResponse = chatgptData.choices[0].message.content;
+                            .then(async response => {
+                                latexResponse = await response.text()
+                                console.log('Server responded:', latexResponse);
+                                current_latex = editor.getValue()
+                                editor.setValue(current_latex + "\n" + latexResponse)
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                            });
+                        }
+
+                        if (parser_mode == "gpt") {
+                            fetch('http://127.0.0.1:5000/parse_audio_gpt', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ text: transcribed_text })
+                            })
+                            .then(async response => {
+                                latexResponse = await response.text()
+                                console.log('Server responded:', latexResponse);
                                 current_latex = editor.getValue()
                                 
                                 if (latexResponse.includes("\\")) {
                                     editor.setValue(current_latex + "\n" + latexResponse)
                                 }
-                                console.log(latexResponse)
-                                // you can now display latexResponse to your user
                             })
-                            .catch(error => console.error('Error communicating with ChatGPT:', error));
-                        
+                            .catch(error => {
+                                console.error('Error:', error);
+                            });
+                        }
                     })
                     .catch(error => {
                         console.error('Error sending audio:', error);
                     });
+
+                    // ========== 👆 Send Blob to Python Flask server ==========
 
                     // ========== 👆 Send Blob to Python Flask server ==========
                 } else {
@@ -348,9 +340,8 @@
             devices.forEach((device) => {
                 const option = document.createElement('option');
                 option.value = device.deviceId;
-                mic_id = device.deviceId
+                mic_id = device.deviceId;
                 option.text = device.label || device.deviceId;
-                // micSelect.appendChild(option);
             });
         });
 
@@ -375,16 +366,6 @@
                 pauseButton.style.display = 'inline';
             });
         }
-
-
-        // document.querySelector('#continuousWaveform').onclick = (e) => {
-        //     continuousWaveform = e.target.checked;
-        //     if (continuousWaveform && scrollingWaveform) {
-        //         scrollingWaveform = false;
-        //         document.querySelector('#scrollingWaveform').checked = false;
-        //     }
-        //     createWaveSurfer();
-        // }
 
         // Initialize on page load
         window.onload = function() {

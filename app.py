@@ -1,11 +1,13 @@
-
-
 import whisper
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import os
-model = whisper.load_model("./models/base.en.pt")
+import re
+import requests
+import json
 
+# Load whisper model
+model = whisper.load_model("./models/base.en.pt")
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -14,7 +16,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def process_audio(file_path):
     # Your Python function to process the audio
     return model.transcribe(file_path)
-
 
 def word_to_number(text):
     units = {
@@ -131,7 +132,6 @@ def parse(text):
 
     return "\\begin{align}\n" + ' '.join(result) + "\n\\end{align}"
 
-
 @app.route('/', methods=["GET"])
 def home():
     return render_template('index.html')  # <== This will load your HTML file
@@ -150,29 +150,105 @@ def handle_audio_upload():
     result = process_audio(file_path)
     print(result["text"])
     return jsonify(result["text"])
-    #transcribed text is returned, must feed into model in the morning
 
 @app.route('/parse_audio', methods=['POST'])
 def hand_parse():
-    data = request.get_json()
-    if not data or 'text' not in data:
-        return jsonify({'error': 'Missing text parameter'}), 400
+    # Check if the request is JSON or raw data
+    if request.is_json:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'error': 'Missing text in request'}), 400
+        text = data['text']
+    else:
+        # Read raw data (plain text)
+        text = request.data.decode('utf-8')
+        
+    if not text:
+        return jsonify({'error': 'Missing text body'}), 400
 
-    text = data['text']
-
-    print(parse(text))
+    print(f"Parse request received: {text}")
+    parsed_result = parse(text)
+    print(f"Parse result: {parsed_result}")
     
-    # For example, just return it back:
-    return parse(text)    
+    return parsed_result
+
+@app.route('/parse_audio_gpt', methods=['POST'])
+def gpt_parse():
+    # Check if the request is JSON or raw data
+    if request.is_json:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'error': 'Missing text in request'}), 400
+        text = data['text']
+    else:
+        # Read raw data (plain text)
+        text = request.data.decode('utf-8')
+        
+    if not text:
+        return jsonify({'error': 'Missing text body'}), 400
+
+    print(f"GPT parse request received: {text}")
+    
+    # OpenAI API configuration
+    openai_api_key = "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"
+    
+    # System prompt for GPT
+    system_prompt = """The user will give you a verbal natural language expression, given by someone trying to write a math expression. Please give it to me in LaTeX, respond only with LaTex, and make it so each term is on a new line, with the begin and end tags having their own lines. For terms involving functions, such as \frac, output the following format:
+
+    \frac
+    {numerator}
+    {denominator}
+
+    Example output:
+
+    \begin{align}
+    \int
+    \frac
+    {-4x^2}
+    {x}
+    dx
+    \end{align}
+
+    Ensure that there are NO "//" substrings present in the output. They will unintentionally create new lines.
+
+    \begin{align}
+    U = \\
+    \ln \\
+    K
+    \end{align}
+
+    THIS is bad output."""
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": text}
+    ]
+    
+    try:
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {openai_api_key}"
+            },
+            json={
+                "model": "gpt-4",
+                "messages": messages
+            }
+        )
+        
+        response_data = response.json()
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            latex_response = response_data['choices'][0]['message']['content']
+            print(f"GPT parse result: {latex_response}")
+            return latex_response
+        else:
+            print(f"Error in GPT response: {response_data}")
+            return "Error processing with GPT. Please try again."
+    
+    except Exception as e:
+        print(f"Error communicating with OpenAI API: {e}")
+        return f"Error: {str(e)}"
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
-
-#sample output
-# {'text': ' 4x squared', 'segments': [{'id': 0, 'seek': 0, 'start': 0.0, 'end': 4.0, 'text': ' 4x squared', 'tokens': [50363, 604, 87, 44345, 50563], 
-# 'temperature': 0.0, 'avg_logprob': -0.629383365313212, 'compression_ratio': 0.5555555555555556, 'no_speech_prob': 0.09730338305234909}], 'language': 'en'}
-#4 x squared
-
-
