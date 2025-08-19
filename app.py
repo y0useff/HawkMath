@@ -23,9 +23,8 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def process_audio(file_path):
-    # Your Python function to process the audio
     return model.transcribe(file_path)
-
+#function to transcribe numbers being spoken to numeric values
 def word_to_number(text):
     units = {
         "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4,
@@ -61,7 +60,7 @@ def word_to_number(text):
         else:
             return None
     return num + current
-
+#function to read and parse keywords that were related to mathematic functions
 def parse(text):
     operations = {
         "add": "+", "plus": "+", "minus": "-", "subtract": "-",
@@ -181,84 +180,6 @@ def hand_parse():
     
     return parsed_result
 
-# @app.route('/parse_audio_gpt', methods=['POST'])
-# def gpt_parse():
-#     # Check if the request is JSON or raw data
-#     if request.is_json:
-#         data = request.get_json()
-#         if not data or 'text' not in data:
-#             return jsonify({'error': 'Missing text in request'}), 400
-#         text = data['text']
-#     else:
-#         # Read raw data (plain text)
-#         text = request.data.decode('utf-8')
-        
-#     if not text:
-#         return jsonify({'error': 'Missing text body'}), 400
-
-#     print(f"GPT parse request received: {text}")
-    
-#     # OpenAI API configuration
-#     openai_api_key = os.getenv('OPENAI_API_KEY')
-    
-#     # System prompt for GPT
-#     system_prompt = """The user will give you a verbal natural language expression, given by someone trying to write a math expression. Please give it to me in LaTeX, respond only with LaTex, and make it so each term is on a new line, with the begin and end tags having their own lines. For terms involving functions, such as \frac, output the following format:
-
-#     \frac
-#     {numerator}
-#     {denominator}
-
-#     Example output:
-
-#     \begin{align}
-#     \int
-#     \frac
-#     {-4x^2}
-#     {x}
-#     dx
-#     \end{align}
-
-#     Ensure that there are NO "//" substrings present in the output. They will unintentionally create new lines.
-
-#     \begin{align}
-#     U = \\
-#     \ln \\
-#     K
-#     \end{align}
-
-#     THIS is bad output."""
-    
-#     messages = [
-#         {"role": "system", "content": system_prompt},
-#         {"role": "user", "content": text}
-#     ]
-    
-#     try:
-#         response = requests.post(
-#             "https://api.openai.com/v1/chat/completions",
-#             headers={
-#                 "Content-Type": "application/json",
-#                 "Authorization": f"Bearer {openai_api_key}"
-#             },
-#             json={
-#                 "model": "gpt-4",
-#                 "messages": messages
-#             }
-#         )
-        
-#         response_data = response.json()
-#         if 'choices' in response_data and len(response_data['choices']) > 0:
-#             latex_response = response_data['choices'][0]['message']['content']
-#             print(f"GPT parse result: {latex_response}")
-
-#             return latex_response
-#         else:
-#             print(f"Error in GPT response: {response_data}")
-#             return "Error processing with GPT. Please try again."
-    
-#     except Exception as e:
-#         print(f"Error communicating with OpenAI API: {e}")
-#         return f"Error: {str(e)}"
 @app.route('/parse_audio_gpt', methods=['POST'])
 def gpt_parse():
     # Check if the request is JSON or raw data
